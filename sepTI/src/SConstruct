@@ -1,0 +1,33 @@
+import os
+
+env = Environment()
+env['SHLIBPREFIX'] = ''
+
+cc = '/opt/local/bin/gcc'
+cxx = '/opt/local/bin/g++'
+cflags = '-std=c99 -fPIC -Wall -Wextra -O3 -DHAVE_INLINE -fopenmp -msse2 -msse -DSF_HAS_FFTW -DSF_HAS_FFTW_OMP'
+
+libpath = ['.']
+cpppath = ['.']
+
+rsfroot = os.environ['RSFROOT']
+rsf_lib = rsfroot+'/lib'
+rsf_inc = rsfroot+'/include'
+fftw_inc = '/Users/hui/local/fftw-3.3.4/include'
+fftw_lib = '/Users/hui/local/fftw-3.3.4/lib'
+
+cpppath.append(rsf_inc)
+libpath.append(rsf_lib)
+libpath.append('.')
+libs = ['rsf','su','m','gomp','gfortran']
+
+env.Library('util',['util.c'],CC=cc,CFLAGS=cflags,CPPPATH=cpppath,LIBS=libs,LIBPATH=libpath)
+
+env.Library('sinc',['sinc.c'],CC=cc,CFLAGS=cflags,CPPPATH=cpppath,LIBS=libs,LIBPATH=libpath)
+
+cpppath.append(fftw_inc)
+libpath.append(fftw_lib)
+libs = ['rsf','su','m','fftw3f_omp','fftw3f']
+linkflags = ['-fopenmp']
+
+env.Program('septi2d.x',['septi2d.c'],CC=cc,CFLAGS=cflags,CPPPATH=cpppath,LIBPATH=libpath,LINKFLAGS=linkflags,LIBS=['sinc','util']+libs)

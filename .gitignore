@@ -1,0 +1,16 @@
+# compiler generated files
+*.exe
+*.so
+*.o
+*.mod
+*.x
+*.pyc
+
+# OS generated files
+.DS_Store
+.Trashes
+.Spotlight_V100
+
+*.dbhash
+*.dblite
+*.sconsign
