@@ -3,8 +3,8 @@ import os
 env = Environment()
 env['SHLIBPREFIX'] = ''
 
-cc = '/opt/local/bin/gcc'
-cxx = '/opt/local/bin/g++'
+cc = os.environ['CC']
+cxx = os.environ['CXX']
 cflags = '-std=c99 -fPIC -Wall -Wextra -O3 -DHAVE_INLINE -fopenmp -msse2 -msse -DSF_HAS_FFTW -DSF_HAS_FFTW_OMP'
 
 libpath = ['.']
@@ -13,8 +13,10 @@ cpppath = ['.']
 rsfroot = os.environ['RSFROOT']
 rsf_lib = rsfroot+'/lib'
 rsf_inc = rsfroot+'/include'
-fftw_inc = '/Users/hui/local/fftw-3.3.4/include'
-fftw_lib = '/Users/hui/local/fftw-3.3.4/lib'
+fftw_inc = os.environ['FFTW_INC']
+fftw_lib = os.environ['FFTW_LIB']
+# fftw_inc = '/Users/hui/local/fftw-3.3.4/include'
+# fftw_lib = '/Users/hui/local/fftw-3.3.4/lib'
 
 cpppath.append(rsf_inc)
 libpath.append(rsf_lib)
