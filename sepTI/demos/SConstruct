@@ -1,0 +1,64 @@
+from rsf.proj import *
+from rsf.recipes import wplot, geom, awe
+import sys
+sys.path.append('../operators')
+from sepTIop import sepTIop2d
+
+par = dict(
+    nz=128,   dz=0.01,  oz=0.0, lz='z', uz='km',
+    nx=128,   dx=0.01,  ox=0.0, lx='x', ux='km',
+    nt=768, dt=0.001, ot=0, lt='t', ut='s',
+    kt=48, abc='y', nb=16, verb='y', free='n',
+    snap='y',
+    )
+wplot.param(par)
+# ------------------------------------------------------------
+# wavelet
+# awe.wavelet('wav',100,'',par)
+awe.wavelet('wav',40,'',par)
+Result('wav','window |' + wplot.waveplot('',par))
+
+# injection point
+geom.point2d('ss2D',0.50*par['dx']*par['nx'], 0.5*par['dz']*par['nz'],'',par)
+geom.horizontal2d('rr2D',par['oz'],'',par)
+# geom.horizontal2d('rr2D_',par['oz'],'',par)
+# Flow('rr2D','rr2D_','window n2=20 f2=10 ')
+
+# velocity vpz
+Flow('vp0',None,
+     '''
+     spike nsp=1 mag=2
+     n1=%(nz)d o1=%(oz)g d1=%(dz)g label1=%(lz)s unit1=%(uz)s
+     n2=%(nx)d o2=%(ox)g d2=%(dx)g label2=%(lx)s unit2=%(ux)s
+     '''%par)
+     #noise range=0.25 | math output="2.3"
+Result('vp0',wplot.igrey2d('mean=y ',par))
+
+Flow('eps','vp0','math output=0.4')
+Flow('del','vp0','math output=0.2')
+# Flow('eps','vp0','noise range=0.04 mean=0.4 rep=y')
+# Flow('del','vp0','noise range=0.04 mean=0.2 rep=y')
+Flow('eta','del eps','math d=${SOURCES[0]} e=${SOURCES[1]} output="(e-d)/(1+2*d)"')
+# Flow('vh','vp0 eps','math v=${SOURCES[0]} e=${SOURCES[1]} output="v*sqrt(1+2*e)"')
+Flow('vn','vp0 del','math v=${SOURCES[0]} d=${SOURCES[1]} output="v*sqrt(1+2*d)"')
+# Flow('theta','vp0','noise range=40 mean=0 rep=y')
+Flow('mvars','vp0 vn eta','cat axis=3 ${SOURCES[1:-1]}')
+# Flow('mvars','vp0 vh eta theta','cat axis=3 ${SOURCES[1:-1]}')
+
+# ------------------------------------------------------------
+# DOT PRODUCT TEST
+# ------------------------------------------------------------
+# plot rules
+plotT  ='window | scale axis=123 |' + wplot.waveplot('',par)
+plotW2D='window j3=50 |'+wplot.igrey2d('',par)
+plotD2D='transp |' + wplot.dgrey2d('',par)
+
+# modelingOp = sepTIop2d('mvars', 'ss2D', 'rr2D', par)
+# modelingOp.FORW('wav', 'fdata')
+
+modelingOp = sepTIop2d('mvars', 'ss2D', '', par)
+modelingOp.FORW('wav', 'fwfl')
+Result('fwfl',plotW2D)
+
+End()
+

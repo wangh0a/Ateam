@@ -1,3 +1,5 @@
+// DONE: linear approximation (equation 14), with absorbing boundary
+// TODO: adjoint mode
 #include <rsf.h>
 #include <omp.h>
 #include <complex.h>
@@ -5,15 +7,17 @@
 #include "util.h"
 #include "sinc.h"
 
-static void 
+static void
 fft_stepforward(
     float **u0, float **u1,
-    float *rwavem, fftwf_complex *cwave, fftwf_complex *cwavem,
-    float **lft, float **rht,
+    float *rwave, float *rwavem,
+    fftwf_complex *cwave, fftwf_complex *cwavem,
+    float **vp, float **vn, float **eta,
+    float *kz, float *kx,
     fftwf_plan forward_plan, fftwf_plan inverse_plan,
     int nz, int nx, int nzpad, int nxpad,
     int nkz, int nkx,
-    int nrank, float wt, bool adj);
+    float wt, bool adj);
 
 int main (int argc, char *argv[])
 {
@@ -25,13 +29,10 @@ int main (int argc, char *argv[])
   float oz0, ox0;
   int nkz, nkx;
   int nzpad, nxpad;
-  int nzx, nkzkx, nrank;
   
   float **u1, **u0;
   float *ws, *wr;
-  float **lft, **rht;
   
-  sf_file file_lft = NULL, file_rht = NULL;
   sf_file file_src = NULL, file_rec = NULL;
   sf_file file_inp = NULL, file_out = NULL;
   sf_file file_mdl = NULL;
@@ -64,8 +65,6 @@ int main (int argc, char *argv[])
   }
   
   file_inp = sf_input("in");
-  file_lft = sf_input("left");
-  file_rht = sf_input("right");
   file_mdl = sf_input("model");
   if (spt) file_src = sf_input("sou");
   if (rpt) file_rec = sf_input("rec");
@@ -93,6 +92,41 @@ int main (int argc, char *argv[])
   nzpad = kiss_fft_next_fast_size( ((nz+1)>>1)<<1 );
   nkx = nxpad = kiss_fft_next_fast_size(nx);
   nkz = nzpad / 2 + 1;
+  /* float okx = - 0.5f / dx; */
+  float okx = 0.f;
+  float okz = 0.f;
+  float dkx = 1.f / (nxpad * dx);
+  float dkz = 1.f / (nzpad * dz);
+
+  float **vp, **vn, **eta;
+  vp = sf_floatalloc2(nz, nx);
+  vn = sf_floatalloc2(nz, nx);
+  eta = sf_floatalloc2(nz, nx);
+  float **tmparray = sf_floatalloc2(nz0, nx0);
+  sf_floatread(tmparray[0], nz0*nx0, file_mdl); expand2d(vp[0], tmparray[0], nz, nx, nz0, nx0);
+  sf_floatread(tmparray[0], nz0*nx0, file_mdl); expand2d(vn[0], tmparray[0], nz, nx, nz0, nx0);
+  sf_floatread(tmparray[0], nz0*nx0, file_mdl); expand2d(eta[0], tmparray[0], nz, nx, nz0, nx0);
+
+  for (int ix=0; ix<nx; ix++) {
+    for (int iz=0; iz<nz; iz++){
+      vp[ix][iz] *= vp[ix][iz];
+      vn[ix][iz] *= vn[ix][iz];
+    }
+  }
+
+  float *kx = sf_floatalloc(nkx);
+  float *kz = sf_floatalloc(nkz);
+  for (int ikx=0; ikx<nkx; ++ikx) {
+    kx[ikx] = okx + ikx * dkx;
+    if (ikx >= nkx/2) kx[ikx] = (nkx - ikx) * dkx;
+    kx[ikx] *= 2 * SF_PI;
+    kx[ikx] *= kx[ikx];
+  }
+  for (int ikz=0; ikz<nkz; ++ikz) {
+    kz[ikz] = okz + ikz * dkz;
+    kz[ikz] *= 2 * SF_PI;
+    kz[ikz] *= kz[ikz];
+  }
 
   if (adj) {
     ai = ar; ao = as;
@@ -129,21 +163,13 @@ int main (int argc, char *argv[])
 
   u0 = sf_floatalloc2(nz, nx);
   u1 = sf_floatalloc2(nz, nx);
+  float *rwave = (float *) fftwf_malloc(nzpad*nxpad*sizeof(float));
   float *rwavem = (float *) fftwf_malloc(nzpad*nxpad*sizeof(float));
   fftwf_complex *cwave = (fftwf_complex *) fftwf_malloc(nkz*nkx*sizeof(fftwf_complex));
   fftwf_complex *cwavem = (fftwf_complex *) fftwf_malloc(nkz*nkx*sizeof(fftwf_complex));
-
-  if (!sf_histint(file_lft, "n1", &nzx) || nzx != nz*nx) sf_error("Need n1=%d in left",nz*nx);
-  if (!sf_histint(file_lft, "n2", &nrank)) sf_error("Need n2= in left"); 
-  if (!sf_histint(file_rht, "n2", &nkzkx) || nkzkx != nkz*nkx) sf_error("Need n2=%d in right",nkz*nkx);
-
-  lft = sf_floatalloc2(nzx, nrank);
-  // rht = sf_floatalloc2(nrank, nkzkx);
-  rht = sf_floatalloc2(nkzkx, nrank);
-  
-  sf_floatread(lft[0], nzx*nrank, file_lft);
-  sf_floatread(rht[0], nrank*nkzkx, file_rht);
-  /* transpose(rht[0], nrank, nkzkx); */
+  /* float *rwavem = (float *) fftwf_malloc(nzpad*nxpad*sizeof(float));
+  fftwf_complex *cwave = (fftwf_complex *) fftwf_malloc(nkz*nkx*sizeof(fftwf_complex));
+  fftwf_complex *cwavem = (fftwf_complex *) fftwf_malloc(nkz*nkx*sizeof(fftwf_complex)); */
 
   /* boundary conditions */
   float **ucut = NULL;
@@ -152,6 +178,7 @@ int main (int argc, char *argv[])
   damp = damp_make(nb);
     
   float wt = 1./(nxpad * nzpad);
+  wt *= dt * dt;
   fftwf_plan forward_plan;
   fftwf_plan inverse_plan;
 #ifdef SF_HAS_FFTW_OMP
@@ -159,7 +186,7 @@ int main (int argc, char *argv[])
   fftwf_plan_with_nthreads(omp_get_max_threads());
 #endif
   forward_plan = fftwf_plan_dft_r2c_2d(nxpad, nzpad,
-              rwavem, cwave, FFTW_MEASURE); 
+              rwave, cwave, FFTW_MEASURE); 
 #ifdef SF_HAS_FFTW_OMP
   fftwf_plan_with_nthreads(omp_get_max_threads());
 #endif
@@ -183,13 +210,19 @@ int main (int argc, char *argv[])
   float **ptrtmp = NULL;
   memset(u0[0], 0, sizeof(float)*nz*nx);
   memset(u1[0], 0, sizeof(float)*nz*nx);
+  memset(rwave, 0, sizeof(float)*nzpad*nxpad);
+  memset(rwavem, 0, sizeof(float)*nzpad*nxpad);
   memset(cwave, 0, sizeof(float)*nkz*nkx*2);
   memset(cwavem, 0, sizeof(float)*nkz*nkx*2);
+
+
   for (int it=itb; it!=ite; it+=itc) { if (verb) sf_warning("it = %d;",it);
     double tic = omp_get_wtime();
     if (ipt) {
       if (adj) sf_seek(file_inp, (off_t)(it)*sizeof(float)*sf_n(ai), SEEK_SET);
       sf_floatread(wi, sf_n(ai), file_inp);
+      for (int i=0; i<sf_n(ai); i++)
+        wi[i] *= dt* dt;
     } else {
       if (adj) sf_seek(file_inp, (off_t)(it)*sizeof(float)*nz0*nx0, SEEK_SET);
       sf_floatread(ucut[0], nz0*nx0, file_inp);
@@ -197,9 +230,10 @@ int main (int argc, char *argv[])
 
     /* apply absorbing boundary condition: E \times u@n-1 */
     damp2d_apply(u0, damp, nz, nx, nb);
-    fft_stepforward(u0, u1, rwavem, cwave, cwavem,
-        lft, rht, forward_plan, inverse_plan,
-        nz, nx, nzpad, nxpad, nkz, nkx, nrank, wt, adj);
+    fft_stepforward(u0, u1, rwave, rwavem, cwave, cwavem,
+        vp, vn, eta, kz, kx,
+        forward_plan, inverse_plan,
+        nz, nx, nzpad, nxpad, nkz, nkx, wt, adj);
 
     // sinc2d_inject1(u0, ws[it][s_idx], cssinc[s_idx]);
     if (ipt) sinc2d_inject(u0, wi, cisinc);
@@ -230,21 +264,25 @@ int main (int argc, char *argv[])
 static void
 fft_stepforward(
     float **u0, float **u1,
-    float *rwavem, fftwf_complex *cwave, fftwf_complex *cwavem,
-    float **lft, float **rht,
+    float *rwave, float *rwavem,
+    fftwf_complex *cwave, fftwf_complex *cwavem,
+    float **vp, float **vn, float **eta,
+    float *kz, float *kx,
     fftwf_plan forward_plan, fftwf_plan inverse_plan,
     int nz, int nx, int nzpad, int nxpad,
     int nkz, int nkx,
-    int nrank, float wt, bool adj)
+    float wt, bool adj)
 {
 #pragma omp parallel for schedule(dynamic,1)
   for (int ix=0; ix<nxpad; ix++) {
+    memset(&rwave[ix*nzpad], 0, sizeof(float)*nzpad);
     memset(&rwavem[ix*nzpad], 0, sizeof(float)*nzpad);
     memset(&cwave[ix*nkz], 0, sizeof(fftwf_complex)*nkz);
     memset(&cwavem[ix*nkz], 0, sizeof(fftwf_complex)*nkz);
   }
 
   if (adj) { /* adjoint modeling */
+#if 0
     for (int im=0; im<nrank; im++) {
 #pragma omp parallel for schedule(dynamic,1)
       /* rwavem = L^T_i \schur_dot rwave */
@@ -280,43 +318,75 @@ fft_stepforward(
           u0[j][i] += rwavem[jj]*wt;
         }
       }
-
+#endif
   } else { /* forward modeling */
 #pragma omp parallel for schedule(dynamic,1)
       for (int j=0; j<nx; j++) {
         for (int i=0; i<nz; i++) {
           int jj = j*nzpad + i;
           u0[j][i] = 2.0f *u1[j][i] - u0[j][i]; 
-          rwavem[jj] = u1[j][i];
+          rwave[jj] = u1[j][i];
         }
       }
 
-    /* --- 3D forward Fourier transform ---*/
+    /* --- 2D forward Fourier transform ---*/
     fftwf_execute(forward_plan);
 
-    for (int im=0; im<nrank; im++) {
-      /* element-wise vector multiplication: u@t(kz,kx) * M3(im,:) */
+    /* term 1 */
 #pragma omp parallel for schedule(dynamic,1)
-        for (int j=0; j<nkx; j++) {
-          for (int ii=0; ii<nkz; ii++) {
-            int idx = j * nkz + ii;
-            cwavem[idx] = rht[im][idx] * cwave[idx];
-          }
-        }
-
-      /* --- 3D backward Fourier transform ---*/
-      fftwf_execute(inverse_plan);
-
-    /* element-wise vector multiplication: M1(:,im) * u@t(z,x) */
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        cwavem[idx] =  cwave[idx] * kx[ikx];
+      }
+    }
+    fftwf_execute(inverse_plan);
 #pragma omp parallel for schedule(dynamic,1)
-        for (int j=0; j<nx; j++) {
-          for (int i=0; i<nz; i++) {
-            int ii = j*nz + i;
-            int jj = j*nzpad + i;
-            /* FFT normalization \times wt */
-            u0[j][i] += lft[im][ii] * rwavem[jj] * wt;
-          }
-        }
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] -= wt * rwavem[jj] * vn[j][i] * (1.f + 2.f * eta[j][i]);
+      }
+    }
+
+    /* term 2 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        cwavem[idx] =  cwave[idx] * kz[ikz];
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] -= wt * rwavem[jj] * vp[j][i];
+      }
+    }
+    /* term 3 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      float inv_kx = 1. / kx[ikx];
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        float inv_kz = 1. / kz[ikz];
+        /* float ratio = kx_ * kz_ / (kx_ + kz_); */
+        float ratio = 0.f;
+        if (isinf(inv_kx) || isinf(inv_kz)) ratio = 0.f;
+        else ratio = 1./ (inv_kx + inv_kz);
+        /* sf_warning("ratio = %f ", ratio); */
+        int idx = ikx * nkz + ikz;
+        cwavem[idx] =  cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] += wt * rwavem[jj] * 2.f * vn[j][i] * eta[j][i];
+      }
     }
   }
   return;
