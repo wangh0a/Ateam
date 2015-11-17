@@ -229,6 +229,9 @@ int main (int argc, char *argv[])
     } else {
       if (adj) sf_seek(file_inp, (off_t)(it)*sizeof(float)*nz0*nx0, SEEK_SET);
       sf_floatread(ucut[0], nz0*nx0, file_inp);
+      for (int j=0; j<nx0; j++)
+      for (int i=0; i<nz0; i++)
+        ucut[j][i] *= dt * dt;
     }
 
     /* apply absorbing boundary condition: E \times u@n-1 */
