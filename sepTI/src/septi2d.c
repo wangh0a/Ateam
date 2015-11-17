@@ -7,6 +7,9 @@
 #include "util.h"
 #include "sinc.h"
 
+#define Q1 .5f
+#define Q2 .25f
+
 static void
 fft_stepforward(
     float **u0, float **u1,
@@ -272,7 +275,27 @@ fft_stepforward(
     int nz, int nx, int nzpad, int nxpad,
     int nkz, int nkx,
     float wt, bool adj)
+
 {
+  float **eps, **lin_eta; //later pass it instead of constantly allocating
+  
+  eps = NULL, lin_eta = NULL;
+ 
+  eps     = sf_floatalloc2(nz, nx);
+  lin_eta = sf_floatalloc2(nz, nx);
+ 
+  float ONE_P_2_DELTA = 0.0f;
+  
+  for (int ix=0; ix<nx; ix++) {
+    for (int iz=0; iz<nz; iz++){
+      ONE_P_2_DELTA   =  vn[ix][iz]/vp[ix][iz];
+      lin_eta[ix][iz] = eta[ix][iz]*ONE_P_2_DELTA;
+      eps    [ix][iz] = ((1.0f + 2.0f*eta[ix][iz])*ONE_P_2_DELTA - 1.0f)*0.5f;     
+    }
+  }
+  
+
+
 #pragma omp parallel for schedule(dynamic,1)
   for (int ix=0; ix<nxpad; ix++) {
     memset(&rwave[ix*nzpad], 0, sizeof(float)*nzpad);
@@ -282,43 +305,40 @@ fft_stepforward(
   }
 
   if (adj) { /* adjoint modeling */
-#if 0
-    for (int im=0; im<nrank; im++) {
-#pragma omp parallel for schedule(dynamic,1)
-      /* rwavem = L^T_i \schur_dot rwave */
-        for (int j=0; j<nx; j++) {
-          for (int i=0; i<nz; i++) {
-            int ii = j*nz+i;
-            int jj = j*nzpad+i;
-            rwavem[jj] = lft[im][ii] * u1[j][i];
-          }
-        }
-      /* --- 3D forward Fourier transform ---*/
-      fftwf_execute(forward_plan);
-
-#pragma omp parallel for schedule(dynamic,1)
-      /* cwavem += R^T_i \schur_dot cwave */
-      for (int j=0; j<nkx; j++) {
-        for (int ii=0; ii<nkz; ii++) {
-          int idx = j * nkz + ii;
-          cwavem[idx] += rht[im][idx] * cwave[idx];
-        }
-      }
-    }
-    /* --- 3D backward Fourier transform ---*/
-    fftwf_execute(inverse_plan);
+//sf_warning("adjoint modeling");
 
 #pragma omp parallel for schedule(dynamic,1)
       for (int j=0; j<nx; j++) {
-        /* FFT centering back for first/second axis */
         for (int i=0; i<nz; i++) {
           int jj = j*nzpad + i;
           u0[j][i] = 2.0f *u1[j][i] - u0[j][i]; 
-          /* FFT normalization */
-          u0[j][i] += rwavem[jj]*wt;
+          rwave[jj] = u1[j][i]*vp[j][i];
         }
+      }      
+
+    /* term 1 only (for isotropic test)*/ 
+
+    /* --- 2D forward Fourier transform ---*/
+    fftwf_execute(forward_plan);
+
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        cwavem[idx] =  cwave[idx] * (kx[ikx]+kz[ikz]);
       }
-#endif
+    }
+
+    fftwf_execute(inverse_plan);
+
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] -= wt * rwavem[jj];
+      }
+    }
+
   } else { /* forward modeling */
 #pragma omp parallel for schedule(dynamic,1)
       for (int j=0; j<nx; j++) {
@@ -388,6 +408,52 @@ fft_stepforward(
         u0[j][i] += wt * rwavem[jj] * 2.f * vn[j][i] * eta[j][i];
       }
     }
+    /* term 4 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      float inv_kx = 1. / kx[ikx];
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        float inv_kz = 1. / kz[ikz];
+        float ratio = 0.f;
+        if (isinf(inv_kx) || isinf(inv_kz)) ratio = 0.f;
+        else ratio = inv_kz / (inv_kx + inv_kz)*(inv_kx + inv_kz);
+        int idx = ikx * nkz + ikz;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] -= wt * rwavem[jj] * 8.f * Q1 * 
+                    vn[j][i] * eps[j][i];
+      }
+    }
+    /* term 5 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      float inv_kx = 1. / kx[ikx];
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        float inv_kz = 1. / kz[ikz];
+        float ratio = 0.f;
+        if (isinf(inv_kx) || isinf(inv_kz)) ratio = 0.f;
+        else ratio = 1./ (inv_kx + inv_kz)*(inv_kx + inv_kz);
+        int idx = ikx * nkz + ikz;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] += wt * rwavem[jj] * 32.f * Q1 * Q2 * 
+                    vn[j][i] * eta[j][i] * lin_eta[j][i];
+      }
+    }
   }
+  free(lin_eta);
+  free(eps);
   return;
 }

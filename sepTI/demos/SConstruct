@@ -1,8 +1,15 @@
 from rsf.proj import *
-from rsf.recipes import wplot, geom, awe
+#try:    from rsf.cluster import *
+#except: from rsf.proj    import *
+from rsf.recipes import wplot, geom, awe, fdmod
 import sys
+
 sys.path.append('../operators')
+sys.path.append('../solvers/')
+
+from injOP import injop2d
 from sepTIop import sepTIop2d
+from DPT import DPT
 
 par = dict(
     nz=128,   dz=0.01,  oz=0.0, lz='z', uz='km',
@@ -12,6 +19,7 @@ par = dict(
     snap='y',
     )
 wplot.param(par)
+fdmod.param(par)
 # ------------------------------------------------------------
 # wavelet
 # awe.wavelet('wav',100,'',par)
@@ -24,18 +32,28 @@ geom.horizontal2d('rr2D',par['oz'],'',par)
 # geom.horizontal2d('rr2D_',par['oz'],'',par)
 # Flow('rr2D','rr2D_','window n2=20 f2=10 ')
 
+# init INJ operator
+I2D=injop2d('ss2D',par)
+
+# ------------------------------------------------------------
+# inject wavelet in the wavefield
+I2D.FORW('wav','win2D')
+Result('win2D','window j3=50 |'+wplot.igrey2d('',par))
+# ------------------------------------------------------------
+
 # velocity vpz
 Flow('vp0',None,
      '''
      spike nsp=1 mag=2
      n1=%(nz)d o1=%(oz)g d1=%(dz)g label1=%(lz)s unit1=%(uz)s
-     n2=%(nx)d o2=%(ox)g d2=%(dx)g label2=%(lx)s unit2=%(ux)s
+     n2=%(nx)d o2=%(ox)g d2=%(dx)g label2=%(lx)s unit2=%(ux)s |
+     noise range=0.25
      '''%par)
      #noise range=0.25 | math output="2.3"
 Result('vp0',wplot.igrey2d('mean=y ',par))
 
-Flow('eps','vp0','math output=0.4')
-Flow('del','vp0','math output=0.2')
+Flow('eps','vp0','math output=0.0')
+Flow('del','vp0','math output=0.0')
 # Flow('eps','vp0','noise range=0.04 mean=0.4 rep=y')
 # Flow('del','vp0','noise range=0.04 mean=0.2 rep=y')
 Flow('eta','del eps','math d=${SOURCES[0]} e=${SOURCES[1]} output="(e-d)/(1+2*d)"')
@@ -56,9 +74,39 @@ plotD2D='transp |' + wplot.dgrey2d('',par)
 # modelingOp = sepTIop2d('mvars', 'ss2D', 'rr2D', par)
 # modelingOp.FORW('wav', 'fdata')
 
-modelingOp = sepTIop2d('mvars', 'ss2D', '', par)
-modelingOp.FORW('wav', 'fwfl')
-Result('fwfl',plotW2D)
+#modelingOp = sepTIop2d('mvars', 'ss2D', '', par)
+#modelingOp.FORW('wav', 'fwfl')
+#modelingOp.ADJT('wav_a', 'fwfl')
+#Result('fwfl',plotW2D)
+
+# Flow('m2Da','win2D','spray axis=3 d=1 o=0 n=2 | window squeeze=n')
+Flow('m2Da','win2D','window squeeze=n')
+Flow('m2Db','wav'  ,'window squeeze=n')
+Flow('m2Dc','win2D','window squeeze=n')
+Flow('m2Dd','wav'  ,'window squeeze=n')
+
+A2Da = dict( op=sepTIop2d, tag='2Da', ss='',    rr='',    plotm=plotW2D,plotd=plotW2D)
+A2Db = dict( op=sepTIop2d, tag='2Db', ss='ss2D',rr='',    plotm=plotT  ,plotd=plotW2D)
+A2Dc = dict( op=sepTIop2d, tag='2Dc', ss='',    rr='rr2D',plotm=plotW2D,plotd=plotD2D)
+A2Dd = dict( op=sepTIop2d, tag='2Dd', ss='ss2D',rr='rr2D',plotm=plotT  ,plotd=plotD2D)
+
+for DICT in [A2Da, A2Db, A2Dc, A2Dd]:
+#for DICT in [A2Db, A2Dc, A2Dd]:
+# for DICT in [A2Da]:
+
+    G=DICT['op']('mvars',DICT['ss'],DICT['rr'],par)
+
+    G.FORW( 'm'+DICT['tag'],'d'+DICT['tag'])
+    G.ADJT( 'k'+DICT['tag'],'d'+DICT['tag'])
+
+    D=DPT(G,'m'+DICT['tag'],'d'+DICT['tag'])
+    D.TEST(DICT['tag'])
+
+    # Result('m'+DICT['tag'],DICT['plotm'])
+    Result('d'+DICT['tag'],DICT['plotd'])
+    Result('k'+DICT['tag'],DICT['plotm'])
+    # Result('data'+DICT['tag'],'d'+DICT['tag'],'window n1=1 f1=64 squeeze=y | transp | ' + fdmod.dgrey('',par))
+
 
 End()
 
