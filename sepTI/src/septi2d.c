@@ -1,5 +1,5 @@
 // DONE: linear approximation (equation 14), with absorbing boundary
-// TODO: adjoint mode
+//  and  adjoint mode
 #include <rsf.h>
 #include <omp.h>
 #include <complex.h>
@@ -15,7 +15,8 @@ fft_stepforward(
     float **u0, float **u1,
     float *rwave, float *rwavem,
     fftwf_complex *cwave, fftwf_complex *cwavem,
-    float **vp, float **vn, float **eta,
+    float **vp, float **vn , float **eta,
+    float **vh, float **eps, float **lin_eta,
     float *kz, float *kx,
     fftwf_plan forward_plan, fftwf_plan inverse_plan,
     int nz, int nx, int nzpad, int nxpad,
@@ -102,20 +103,35 @@ int main (int argc, char *argv[])
   float dkz = 1.f / (nzpad * dz);
 
   float **vp, **vn, **eta;
-  vp = sf_floatalloc2(nz, nx);
-  vn = sf_floatalloc2(nz, nx);
+  vp  = sf_floatalloc2(nz, nx);
+  vn  = sf_floatalloc2(nz, nx);
   eta = sf_floatalloc2(nz, nx);
   float **tmparray = sf_floatalloc2(nz0, nx0);
   sf_floatread(tmparray[0], nz0*nx0, file_mdl); expand2d(vp[0], tmparray[0], nz, nx, nz0, nx0);
   sf_floatread(tmparray[0], nz0*nx0, file_mdl); expand2d(vn[0], tmparray[0], nz, nx, nz0, nx0);
   sf_floatread(tmparray[0], nz0*nx0, file_mdl); expand2d(eta[0], tmparray[0], nz, nx, nz0, nx0);
 
+  float **eps, **lin_eta, **vh;  
+  eps = NULL, lin_eta = NULL, vh = NULL;
+ 
+  eps     = sf_floatalloc2(nz, nx);
+  lin_eta = sf_floatalloc2(nz, nx);
+  vh      = sf_floatalloc2(nz, nx);
+
+  float ONE_P_2_DELTA = 0.0f;
+
   for (int ix=0; ix<nx; ix++) {
     for (int iz=0; iz<nz; iz++){
-      vp[ix][iz] *= vp[ix][iz];
-      vn[ix][iz] *= vn[ix][iz];
+      vp[ix][iz]     *= vp[ix][iz];
+      vn[ix][iz]     *= vn[ix][iz];
+      ONE_P_2_DELTA   =  vn[ix][iz] / vp[ix][iz];
+      vh[ix][iz]      =  vn[ix][iz] * (1.0f + 2.0f * eta[ix][iz]);
+      lin_eta[ix][iz] = eta[ix][iz] * ONE_P_2_DELTA;
+      eps    [ix][iz] = ((1.0f + 2.0f * eta[ix][iz]) * 
+                          ONE_P_2_DELTA - 1.0f) * 0.5f;     
     }
   }
+
 
   float *kx = sf_floatalloc(nkx);
   float *kz = sf_floatalloc(nkz);
@@ -237,7 +253,7 @@ int main (int argc, char *argv[])
     /* apply absorbing boundary condition: E \times u@n-1 */
     damp2d_apply(u0, damp, nz, nx, nb);
     fft_stepforward(u0, u1, rwave, rwavem, cwave, cwavem,
-        vp, vn, eta, kz, kx,
+        vp, vn, eta, vh, eps, lin_eta, kz, kx,
         forward_plan, inverse_plan,
         nz, nx, nzpad, nxpad, nkz, nkx, wt, adj);
 
@@ -273,6 +289,7 @@ fft_stepforward(
     float *rwave, float *rwavem,
     fftwf_complex *cwave, fftwf_complex *cwavem,
     float **vp, float **vn, float **eta,
+    float **vh, float **eps, float **lin_eta,
     float *kz, float *kx,
     fftwf_plan forward_plan, fftwf_plan inverse_plan,
     int nz, int nx, int nzpad, int nxpad,
@@ -280,24 +297,6 @@ fft_stepforward(
     float wt, bool adj)
 
 {
-  float **eps, **lin_eta; //later pass it instead of constantly allocating
-  
-  eps = NULL, lin_eta = NULL;
- 
-  eps     = sf_floatalloc2(nz, nx);
-  lin_eta = sf_floatalloc2(nz, nx);
- 
-  float ONE_P_2_DELTA = 0.0f;
-  
-  for (int ix=0; ix<nx; ix++) {
-    for (int iz=0; iz<nz; iz++){
-      ONE_P_2_DELTA   =  vn[ix][iz]/vp[ix][iz];
-      lin_eta[ix][iz] = eta[ix][iz]*ONE_P_2_DELTA;
-      eps    [ix][iz] = ((1.0f + 2.0f*eta[ix][iz])*ONE_P_2_DELTA - 1.0f)*0.5f;     
-    }
-  }
-  
-
 
 #pragma omp parallel for schedule(dynamic,1)
   for (int ix=0; ix<nxpad; ix++) {
@@ -316,7 +315,7 @@ fft_stepforward(
         for (int i=0; i<nz; i++) {
           int jj = j*nzpad + i;
           u0[j][i] = 2.0f * u1[j][i] - u0[j][i]; 
-          rwave[jj] = u1[j][i] * vn[j][i] * (1.f + 2.f * eta[j][i]);
+          rwave[jj] = u1[j][i] * vh[j][i];
         }
       }      
 
@@ -470,7 +469,7 @@ fft_stepforward(
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
-        u0[j][i] -= wt * rwavem[jj] * vn[j][i] * (1.f + 2.f * eta[j][i]);
+        u0[j][i] -= wt * rwavem[jj] * vh[j][i];
       }
     }
 
@@ -558,7 +557,6 @@ fft_stepforward(
       }
     }
   }
-  free(lin_eta);
-  free(eps);
+
   return;
 }
