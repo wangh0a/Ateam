@@ -52,8 +52,8 @@ Flow('vp0',None,
      #noise range=0.25 | math output="2.3"
 Result('vp0',wplot.igrey2d('mean=y ',par))
 
-Flow('eps','vp0','math output=0.0')
-Flow('del','vp0','math output=0.0')
+Flow('eps','vp0','math output=0.4 | noise range=0.05')
+Flow('del','vp0','math output=0.2 | noise range=0.05')
 # Flow('eps','vp0','noise range=0.04 mean=0.4 rep=y')
 # Flow('del','vp0','noise range=0.04 mean=0.2 rep=y')
 Flow('eta','del eps','math d=${SOURCES[0]} e=${SOURCES[1]} output="(e-d)/(1+2*d)"')
@@ -92,7 +92,6 @@ A2Dd = dict( op=sepTIop2d, tag='2Dd', ss='ss2D',rr='rr2D',plotm=plotT  ,plotd=pl
 
 for DICT in [A2Da, A2Db, A2Dc, A2Dd]:
 #for DICT in [A2Db, A2Dc, A2Dd]:
-# for DICT in [A2Da]:
 
     G=DICT['op']('mvars',DICT['ss'],DICT['rr'],par)
 

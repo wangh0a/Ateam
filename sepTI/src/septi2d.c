@@ -308,18 +308,17 @@ fft_stepforward(
   }
 
   if (adj) { /* adjoint modeling */
-//sf_warning("adjoint modeling");
+
+    /* adj term 1 */ 
 
 #pragma omp parallel for schedule(dynamic,1)
       for (int j=0; j<nx; j++) {
         for (int i=0; i<nz; i++) {
           int jj = j*nzpad + i;
-          u0[j][i] = 2.0f *u1[j][i] - u0[j][i]; 
-          rwave[jj] = u1[j][i]*vp[j][i];
+          u0[j][i] = 2.0f * u1[j][i] - u0[j][i]; 
+          rwave[jj] = u1[j][i] * vn[j][i] * (1.f + 2.f * eta[j][i]);
         }
       }      
-
-    /* term 1 only (for isotropic test)*/ 
 
     /* --- 2D forward Fourier transform ---*/
     fftwf_execute(forward_plan);
@@ -328,7 +327,110 @@ fft_stepforward(
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
-        cwavem[idx] =  cwave[idx] * (kx[ikx]+kz[ikz]);
+        cwavem[idx] += cwave[idx] * kx[ikx];
+        //cwavem[idx] =  cwave[idx] * (kx[ikx]+kz[ikz]);
+      }
+    }
+
+    /* adj term 2 */ 
+
+#pragma omp parallel for schedule(dynamic,1)
+      for (int j=0; j<nx; j++) {
+        for (int i=0; i<nz; i++) {
+          int jj = j*nzpad + i;
+          rwave[jj] = u1[j][i] * vp[j][i];
+        }
+      }
+
+    /* --- 2D forward Fourier transform ---*/
+    fftwf_execute(forward_plan);
+
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        cwavem[idx] += cwave[idx] * kz[ikz];
+      }
+    }
+
+    /* adj term 3 */ 
+
+#pragma omp parallel for schedule(dynamic,1)
+      for (int j=0; j<nx; j++) {
+        for (int i=0; i<nz; i++) {
+          int jj = j*nzpad + i;
+          rwave[jj] = u1[j][i] * vn[j][i] * eta[j][i] * 2.f;
+        }
+      }
+
+    /* --- 2D forward Fourier transform ---*/
+    fftwf_execute(forward_plan);
+
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      float inv_kx = 1. / kx[ikx];
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        float inv_kz = 1. / kz[ikz];
+        /* float ratio = kx_ * kz_ / (kx_ + kz_); */
+        float ratio = 0.f;
+        if (isinf(inv_kx) || isinf(inv_kz)) ratio = 0.f;
+        else ratio = 1./ (inv_kx + inv_kz);
+        /* sf_warning("ratio = %f ", ratio); */
+        int idx = ikx * nkz + ikz;
+        cwavem[idx] -=  cwave[idx] * ratio;
+      }
+    }
+
+    /* adj term 4 */ 
+
+#pragma omp parallel for schedule(dynamic,1)
+      for (int j=0; j<nx; j++) {
+        for (int i=0; i<nz; i++) {
+          int jj = j*nzpad + i;
+          rwave[jj] = u1[j][i] * vn[j][i] * eps[j][i] * 8.f * Q1;
+        }
+      }
+
+    /* --- 2D forward Fourier transform ---*/
+    fftwf_execute(forward_plan);
+
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      float inv_kx = 1. / kx[ikx];
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        float inv_kz = 1. / kz[ikz];
+        float ratio = 0.f;
+        if (isinf(inv_kx) || isinf(inv_kz)) ratio = 0.f;
+        else ratio = inv_kz / (inv_kx + inv_kz)*(inv_kx + inv_kz);
+        int idx = ikx * nkz + ikz;
+        cwavem[idx] += cwave[idx] * ratio;
+      }
+    }
+
+    /* adj term 5 */ 
+
+#pragma omp parallel for schedule(dynamic,1)
+      for (int j=0; j<nx; j++) {
+        for (int i=0; i<nz; i++) {
+          int jj = j*nzpad + i;
+          rwave[jj] = u1[j][i] * vn[j][i] * eta[j][i] * 32.f * Q1 * Q2 *
+                                            lin_eta[j][i];
+        }
+      }
+
+    /* --- 2D forward Fourier transform ---*/
+    fftwf_execute(forward_plan);
+
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      float inv_kx = 1. / kx[ikx];
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        float inv_kz = 1. / kz[ikz];
+        float ratio = 0.f;
+        if (isinf(inv_kx) || isinf(inv_kz)) ratio = 0.f;
+        else ratio = 1./ (inv_kx + inv_kz)*(inv_kx + inv_kz);
+        int idx = ikx * nkz + ikz;
+        cwavem[idx] -= cwave[idx] * ratio;
       }
     }
 
