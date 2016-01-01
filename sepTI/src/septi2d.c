@@ -520,7 +520,7 @@ fft_stepforward(
         float inv_kz = 1. / kz[ikz];
         float ratio = 0.f;
         if (isinf(inv_kx) || isinf(inv_kz)) ratio = 0.f;
-        else ratio = inv_kz / (inv_kx + inv_kz)*(inv_kx + inv_kz);
+        else ratio = inv_kz / ((inv_kx + inv_kz)*(inv_kx + inv_kz));
         int idx = ikx * nkz + ikz;
         cwavem[idx] = cwave[idx] * ratio;
       }
@@ -542,7 +542,7 @@ fft_stepforward(
         float inv_kz = 1. / kz[ikz];
         float ratio = 0.f;
         if (isinf(inv_kx) || isinf(inv_kz)) ratio = 0.f;
-        else ratio = 1./ (inv_kx + inv_kz)*(inv_kx + inv_kz);
+        else ratio = 1./ ((inv_kx + inv_kz)*(inv_kx + inv_kz) * (kx[ikx]+kz[ikz]));
         int idx = ikx * nkz + ikz;
         cwavem[idx] = cwave[idx] * ratio;
       }
