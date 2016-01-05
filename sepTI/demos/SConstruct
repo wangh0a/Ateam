@@ -46,22 +46,21 @@ Flow('vp0',None,
      '''
      spike nsp=1 mag=2
      n1=%(nz)d o1=%(oz)g d1=%(dz)g label1=%(lz)s unit1=%(uz)s
-     n2=%(nx)d o2=%(ox)g d2=%(dx)g label2=%(lx)s unit2=%(ux)s |
-     noise range=0.25
+     n2=%(nx)d o2=%(ox)g d2=%(dx)g label2=%(lx)s unit2=%(ux)s 
      '''%par)
      #noise range=0.25 | math output="2.3"
 Result('vp0',wplot.igrey2d('mean=y ',par))
 
-Flow('eps','vp0','math output=0.4 | noise range=0.05')
-Flow('del','vp0','math output=0.2 | noise range=0.05')
-# Flow('eps','vp0','noise range=0.04 mean=0.4 rep=y')
-# Flow('del','vp0','noise range=0.04 mean=0.2 rep=y')
+# Flow('eps','vp0','math output=0.4 ')
+# Flow('del','vp0','math output=0.2 ')
+Flow('eps','vp0','noise range=0.04 mean=0.4 rep=y')
+Flow('del','vp0','noise range=0.04 mean=0.2 rep=y')
 Flow('eta','del eps','math d=${SOURCES[0]} e=${SOURCES[1]} output="(e-d)/(1+2*d)"')
 # Flow('vh','vp0 eps','math v=${SOURCES[0]} e=${SOURCES[1]} output="v*sqrt(1+2*e)"')
-Flow('vn','vp0 del','math v=${SOURCES[0]} d=${SOURCES[1]} output="v*sqrt(1+2*d)"')
+# Flow('vn','vp0 del','math v=${SOURCES[0]} d=${SOURCES[1]} output="v*sqrt(1+2*d)"')
 # Flow('theta','vp0','noise range=40 mean=0 rep=y')
-Flow('mvars','vp0 vn eta','cat axis=3 ${SOURCES[1:-1]}')
-# Flow('mvars','vp0 vh eta theta','cat axis=3 ${SOURCES[1:-1]}')
+Flow('theta','vp0','math output=40 ')
+Flow('mvars','vp0 eps del theta','cat axis=3 ${SOURCES[1:-1]}')
 
 # ------------------------------------------------------------
 # DOT PRODUCT TEST
@@ -90,7 +89,8 @@ A2Db = dict( op=sepTIop2d, tag='2Db', ss='ss2D',rr='',    plotm=plotT  ,plotd=pl
 A2Dc = dict( op=sepTIop2d, tag='2Dc', ss='',    rr='rr2D',plotm=plotW2D,plotd=plotD2D)
 A2Dd = dict( op=sepTIop2d, tag='2Dd', ss='ss2D',rr='rr2D',plotm=plotT  ,plotd=plotD2D)
 
-for DICT in [A2Da, A2Db, A2Dc, A2Dd]:
+# for DICT in [A2Da, A2Db, A2Dc, A2Dd]:
+for DICT in [A2Db]:
 #for DICT in [A2Db, A2Dc, A2Dd]:
 
     G=DICT['op']('mvars',DICT['ss'],DICT['rr'],par)

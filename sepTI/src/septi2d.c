@@ -1,5 +1,7 @@
-// DONE: linear approximation (equation 14), with absorbing boundary
-//  and  adjoint mode
+// DONE: VTI linear approximation (equation 14), with absorbing boundary
+// TODO: 1. make same I/O interface as TTI
+//       2. remove isinf, use Knuth's comparison algorithm instead
+//       3. clear out unnecessary arrays
 #include <rsf.h>
 #include <omp.h>
 #include <complex.h>
@@ -9,6 +11,9 @@
 
 #define Q1 .5f
 #define Q2 .25f
+
+#define EPSILON 1e-7
+#define is_zero(a) essentiallyEqual(a, 0.f, EPSILON)
 
 static void
 fft_stepforward(
@@ -102,33 +107,31 @@ int main (int argc, char *argv[])
   float dkx = 1.f / (nxpad * dx);
   float dkz = 1.f / (nzpad * dz);
 
-  float **vp, **vn, **eta;
+  float **vp, **eps, **del;
   vp  = sf_floatalloc2(nz, nx);
-  vn  = sf_floatalloc2(nz, nx);
-  eta = sf_floatalloc2(nz, nx);
+  eps = sf_floatalloc2(nz, nx);
+  del = sf_floatalloc2(nz, nx);
   float **tmparray = sf_floatalloc2(nz0, nx0);
   sf_floatread(tmparray[0], nz0*nx0, file_mdl); expand2d(vp[0], tmparray[0], nz, nx, nz0, nx0);
-  sf_floatread(tmparray[0], nz0*nx0, file_mdl); expand2d(vn[0], tmparray[0], nz, nx, nz0, nx0);
-  sf_floatread(tmparray[0], nz0*nx0, file_mdl); expand2d(eta[0], tmparray[0], nz, nx, nz0, nx0);
+  sf_floatread(tmparray[0], nz0*nx0, file_mdl); expand2d(eps[0], tmparray[0], nz, nx, nz0, nx0);
+  sf_floatread(tmparray[0], nz0*nx0, file_mdl); expand2d(del[0], tmparray[0], nz, nx, nz0, nx0);
 
-  float **eps, **lin_eta, **vh;  
-  eps = NULL, lin_eta = NULL, vh = NULL;
+  float **vn, **vh;  
+  float **eta, **lin_eta;
+  lin_eta = NULL, vh = NULL;
  
-  eps     = sf_floatalloc2(nz, nx);
+  vn = sf_floatalloc2(nz, nx);
+  vh = sf_floatalloc2(nz, nx);
+  eta = sf_floatalloc2(nz, nx);
   lin_eta = sf_floatalloc2(nz, nx);
-  vh      = sf_floatalloc2(nz, nx);
-
-  float ONE_P_2_DELTA = 0.0f;
 
   for (int ix=0; ix<nx; ix++) {
     for (int iz=0; iz<nz; iz++){
-      vp[ix][iz]     *= vp[ix][iz];
-      vn[ix][iz]     *= vn[ix][iz];
-      ONE_P_2_DELTA   =  vn[ix][iz] / vp[ix][iz];
-      vh[ix][iz]      =  vn[ix][iz] * (1.0f + 2.0f * eta[ix][iz]);
-      lin_eta[ix][iz] = eta[ix][iz] * ONE_P_2_DELTA;
-      eps    [ix][iz] = ((1.0f + 2.0f * eta[ix][iz]) * 
-                          ONE_P_2_DELTA - 1.0f) * 0.5f;     
+      vp[ix][iz] *= vp[ix][iz];
+      vn[ix][iz] = vp[ix][iz] * (1.f + 2.f * del[ix][iz]);
+      vh[ix][iz] = vp[ix][iz] * (1.f + 2.f * eps[ix][iz]);
+      eta[ix][iz] = (eps[ix][iz] - del[ix][iz]) / (1.f + 2.f * del[ix][iz]);
+      lin_eta[ix][iz] = eta[ix][iz] * (1.f + 2.f * del[ix][iz]);
     }
   }
 
@@ -137,7 +140,8 @@ int main (int argc, char *argv[])
   float *kz = sf_floatalloc(nkz);
   for (int ikx=0; ikx<nkx; ++ikx) {
     kx[ikx] = okx + ikx * dkx;
-    if (ikx >= nkx/2) kx[ikx] = (nkx - ikx) * dkx;
+    /* if (ikx >= nkx/2) kx[ikx] = (nkx - ikx) * dkx; */
+    if (ikx >= nkx/2) kx[ikx] = (ikx - nkx) * dkx;
     kx[ikx] *= 2 * SF_PI;
     kx[ikx] *= kx[ikx];
   }
@@ -234,7 +238,6 @@ int main (int argc, char *argv[])
   memset(cwave, 0, sizeof(float)*nkz*nkx*2);
   memset(cwavem, 0, sizeof(float)*nkz*nkx*2);
 
-
   for (int it=itb; it!=ite; it+=itc) { if (verb) sf_warning("it = %d;",it);
     double tic = omp_get_wtime();
     if (ipt) {
@@ -309,7 +312,6 @@ fft_stepforward(
   if (adj) { /* adjoint modeling */
 
     /* adj term 1 */ 
-
 #pragma omp parallel for schedule(dynamic,1)
       for (int j=0; j<nx; j++) {
         for (int i=0; i<nz; i++) {
@@ -332,7 +334,6 @@ fft_stepforward(
     }
 
     /* adj term 2 */ 
-
 #pragma omp parallel for schedule(dynamic,1)
       for (int j=0; j<nx; j++) {
         for (int i=0; i<nz; i++) {
@@ -353,7 +354,6 @@ fft_stepforward(
     }
 
     /* adj term 3 */ 
-
 #pragma omp parallel for schedule(dynamic,1)
       for (int j=0; j<nx; j++) {
         for (int i=0; i<nz; i++) {
@@ -381,12 +381,11 @@ fft_stepforward(
     }
 
     /* adj term 4 */ 
-
 #pragma omp parallel for schedule(dynamic,1)
       for (int j=0; j<nx; j++) {
         for (int i=0; i<nz; i++) {
           int jj = j*nzpad + i;
-          rwave[jj] = u1[j][i] * vn[j][i] * eps[j][i] * 8.f * Q1;
+          rwave[jj] = u1[j][i] * vn[j][i] * eps[j][i] * eta[j][i] * 8.f * Q1;
         }
       }
 
@@ -406,14 +405,13 @@ fft_stepforward(
       }
     }
 
-    /* adj term 5 */ 
 
+    /* adj term 5 */ 
 #pragma omp parallel for schedule(dynamic,1)
       for (int j=0; j<nx; j++) {
         for (int i=0; i<nz; i++) {
           int jj = j*nzpad + i;
-          rwave[jj] = u1[j][i] * vn[j][i] * eta[j][i] * 32.f * Q1 * Q2 *
-                                            lin_eta[j][i];
+          rwave[jj] = u1[j][i] * vn[j][i] * eta[j][i] * 32.f * Q1 * Q2 * lin_eta[j][i];
         }
       }
 
@@ -489,17 +487,16 @@ fft_stepforward(
         u0[j][i] -= wt * rwavem[jj] * vp[j][i];
       }
     }
+
     /* term 3 */
 #pragma omp parallel for schedule(dynamic,1)
     for (int ikx=0; ikx<nkx; ++ikx) {
       float inv_kx = 1. / kx[ikx];
       for (int ikz=0; ikz<nkz; ++ikz) {
         float inv_kz = 1. / kz[ikz];
-        /* float ratio = kx_ * kz_ / (kx_ + kz_); */
         float ratio = 0.f;
         if (isinf(inv_kx) || isinf(inv_kz)) ratio = 0.f;
         else ratio = 1./ (inv_kx + inv_kz);
-        /* sf_warning("ratio = %f ", ratio); */
         int idx = ikx * nkz + ikz;
         cwavem[idx] =  cwave[idx] * ratio;
       }
@@ -512,6 +509,7 @@ fft_stepforward(
         u0[j][i] += wt * rwavem[jj] * 2.f * vn[j][i] * eta[j][i];
       }
     }
+
     /* term 4 */
 #pragma omp parallel for schedule(dynamic,1)
     for (int ikx=0; ikx<nkx; ++ikx) {
@@ -520,7 +518,7 @@ fft_stepforward(
         float inv_kz = 1. / kz[ikz];
         float ratio = 0.f;
         if (isinf(inv_kx) || isinf(inv_kz)) ratio = 0.f;
-        else ratio = inv_kz / ((inv_kx + inv_kz)*(inv_kx + inv_kz));
+        else ratio = inv_kz / ((inv_kx + inv_kz) * (inv_kx + inv_kz));
         int idx = ikx * nkz + ikz;
         cwavem[idx] = cwave[idx] * ratio;
       }
@@ -530,10 +528,10 @@ fft_stepforward(
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
-        u0[j][i] -= wt * rwavem[jj] * 8.f * Q1 * 
-                    vn[j][i] * eps[j][i];
+        u0[j][i] -= wt * rwavem[jj] * 8.f * Q1 * vn[j][i] * eps[j][i] * eta[j][i];
       }
     }
+
     /* term 5 */
 #pragma omp parallel for schedule(dynamic,1)
     for (int ikx=0; ikx<nkx; ++ikx) {
@@ -542,7 +540,7 @@ fft_stepforward(
         float inv_kz = 1. / kz[ikz];
         float ratio = 0.f;
         if (isinf(inv_kx) || isinf(inv_kz)) ratio = 0.f;
-        else ratio = 1./ ((inv_kx + inv_kz)*(inv_kx + inv_kz) * (kx[ikx]+kz[ikz]));
+        else ratio = 1./ ((inv_kx + inv_kz) * (inv_kx + inv_kz) * (kx[ikx]+kz[ikz]));
         int idx = ikx * nkz + ikz;
         cwavem[idx] = cwave[idx] * ratio;
       }
@@ -552,8 +550,7 @@ fft_stepforward(
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
-        u0[j][i] += wt * rwavem[jj] * 32.f * Q1 * Q2 * 
-                    vn[j][i] * eta[j][i] * lin_eta[j][i];
+        u0[j][i] += wt * rwavem[jj] * 32.f * Q1 * Q2 * vn[j][i] * eta[j][i] * lin_eta[j][i];
       }
     }
   }

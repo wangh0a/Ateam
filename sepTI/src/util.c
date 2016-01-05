@@ -94,3 +94,16 @@ damp2d_apply(float **uu, float *damp, int nz, int nx, int nb)
   return;
 }
 
+
+/* floating point number comparison from knuth's book */
+/* essentialEqual needs more closer values to return true */
+bool approximatelyEqual(float a, float b, float epsilon)
+{
+  return fabs(a - b) <= ( (fabs(a) < fabs(b) ? fabs(b) : fabs(a)) * epsilon);
+}
+
+bool essentiallyEqual(float a, float b, float epsilon)
+{
+  return fabs(a - b) <= ( (fabs(a) > fabs(b) ? fabs(b) : fabs(a)) * epsilon);
+}
+
