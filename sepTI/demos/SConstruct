@@ -16,7 +16,7 @@ par = dict(
     nx=128,   dx=0.01,  ox=0.0, lx='x', ux='km',
     nt=768, dt=0.001, ot=0, lt='t', ut='s',
     kt=48, abc='y', nb=16, verb='y', free='n',
-    snap='y',
+    snap='y', atype='vti',
     )
 wplot.param(par)
 fdmod.param(par)

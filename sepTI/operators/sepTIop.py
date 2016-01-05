@@ -1,6 +1,7 @@
 from rsf.proj import *
 
-septi2d = '../src/septi2d.x'
+sepvti2d = '../src/sepvti2d.x'
+septti2d = '../src/septti2d.x'
 
 # ========================================= #
 class sepTIop2d:
@@ -9,6 +10,9 @@ class sepTIop2d:
         self.v = v
         self.custom = custom
         self.par = 'verb=%(verb)s nb=%(nb)d snap=%(snap)s '%par+custom
+        self.septi2d = sepvti2d
+        if par['atype'] == 'tti':
+            self.septi2d = septti2d
         
         self.dep = [self.v]
         self.ss = ''
@@ -24,14 +28,14 @@ class sepTIop2d:
     # ------------------------------------- #
     def FORW(self, m, d):
         Flow(d, [m]+self.dep,
-            septi2d 
+            self.septi2d 
             + ''' adj=n model=${SOURCES[1]} ''' 
             + self.ss + self.rr + self.par)
 
     # ------------------------------------- #
     def ADJT(self, m, d):
         Flow(m, [d]+self.dep,
-            septi2d 
+            self.septi2d 
             + ''' adj=y model=${SOURCES[1]} ''' 
             + self.ss + self.rr + self.par)
 

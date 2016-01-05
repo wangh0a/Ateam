@@ -33,7 +33,7 @@ libpath.append(fftw_lib)
 libs = ['rsf','su','m','fftw3f_omp','fftw3f']
 linkflags = ['-fopenmp']
 
-env.Program('septi2d.x',['septi2d.c'],CC=cc,CFLAGS=cflags,CPPPATH=cpppath,
+env.Program('sepvti2d.x',['sepvti2d.c'],CC=cc,CFLAGS=cflags,CPPPATH=cpppath,
             LIBPATH=libpath,LINKFLAGS=linkflags,LIBS=['sinc','util']+libs)
 
 proj = Project()
