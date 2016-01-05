@@ -1,13 +1,10 @@
 from rsf.proj import *
-#try:    from rsf.cluster import *
-#except: from rsf.proj    import *
 from rsf.recipes import wplot, geom, awe, fdmod
 import sys
 
 sys.path.append('../operators')
 sys.path.append('../solvers/')
 
-from injOP import injop2d
 from sepTIop import sepTIop2d
 from DPT import DPT
 
@@ -31,15 +28,6 @@ geom.point2d('ss2D',0.50*par['dx']*par['nx'], 0.5*par['dz']*par['nz'],'',par)
 geom.horizontal2d('rr2D',par['oz'],'',par)
 # geom.horizontal2d('rr2D_',par['oz'],'',par)
 # Flow('rr2D','rr2D_','window n2=20 f2=10 ')
-
-# init INJ operator
-I2D=injop2d('ss2D',par)
-
-# ------------------------------------------------------------
-# inject wavelet in the wavefield
-I2D.FORW('wav','win2D')
-Result('win2D','window j3=50 |'+wplot.igrey2d('',par))
-# ------------------------------------------------------------
 
 # velocity vpz
 Flow('vp0',None,
@@ -79,9 +67,13 @@ plotD2D='transp |' + wplot.dgrey2d('',par)
 #Result('fwfl',plotW2D)
 
 # Flow('m2Da','win2D','spray axis=3 d=1 o=0 n=2 | window squeeze=n')
-Flow('m2Da','win2D','window squeeze=n')
+Flow('m2Da','wav','''
+    spray axis=1 n=%(nz)d d=%(dz)g o=%(oz)g label=%(lz)s unit=%(uz)s |
+    spray axis=2 n=%(nx)d d=%(dx)g o=%(ox)g label=%(lx)s unit=%(ux)s |
+    window
+    '''%par) 
 Flow('m2Db','wav'  ,'window squeeze=n')
-Flow('m2Dc','win2D','window squeeze=n')
+Flow('m2Dc','m2Da','window squeeze=n')
 Flow('m2Dd','wav'  ,'window squeeze=n')
 
 A2Da = dict( op=sepTIop2d, tag='2Da', ss='',    rr='',    plotm=plotW2D,plotd=plotW2D)
@@ -89,8 +81,7 @@ A2Db = dict( op=sepTIop2d, tag='2Db', ss='ss2D',rr='',    plotm=plotT  ,plotd=pl
 A2Dc = dict( op=sepTIop2d, tag='2Dc', ss='',    rr='rr2D',plotm=plotW2D,plotd=plotD2D)
 A2Dd = dict( op=sepTIop2d, tag='2Dd', ss='ss2D',rr='rr2D',plotm=plotT  ,plotd=plotD2D)
 
-# for DICT in [A2Da, A2Db, A2Dc, A2Dd]:
-for DICT in [A2Db]:
+for DICT in [A2Da, A2Db, A2Dc, A2Dd]:
 #for DICT in [A2Db, A2Dc, A2Dd]:
 
     G=DICT['op']('mvars',DICT['ss'],DICT['rr'],par)

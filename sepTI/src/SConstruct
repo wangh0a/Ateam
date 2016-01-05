@@ -35,13 +35,5 @@ linkflags = ['-fopenmp']
 
 env.Program('sepvti2d.x',['sepvti2d.c'],CC=cc,CFLAGS=cflags,CPPPATH=cpppath,
             LIBPATH=libpath,LINKFLAGS=linkflags,LIBS=['sinc','util']+libs)
-
-proj = Project()
-
-flg=" -fopenmp -O3 -DNO_BLAS -std=gnu99 -Wall -pedantic -flax-vector-conversions '-D__has_extension(x)=0' -D__VFORCE_H"
-
-libpath = proj.get('LIBPATH')
-libpath.append('.')
-
-proj.Library('fdutil',['fdutil.c'],LIBS=libs,CFLAGS=flg)
-proj.Program('INJOP2D.x',['INJOP2D.c'],CFLAGS=flg,LIBS=['fdutil']+libs)
+env.Program('septti2d.x',['septti2d.c'],CC=cc,CFLAGS=cflags,CPPPATH=cpppath,
+            LIBPATH=libpath,LINKFLAGS=linkflags,LIBS=['sinc','util']+libs)
