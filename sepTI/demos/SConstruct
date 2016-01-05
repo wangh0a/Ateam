@@ -39,10 +39,10 @@ Flow('vp0',None,
      #noise range=0.25 | math output="2.3"
 Result('vp0',wplot.igrey2d('mean=y ',par))
 
-# Flow('eps','vp0','math output=0.4 ')
-# Flow('del','vp0','math output=0.2 ')
-Flow('eps','vp0','noise range=0.04 mean=0.4 rep=y')
-Flow('del','vp0','noise range=0.04 mean=0.2 rep=y')
+Flow('eps','vp0','math output=0.4 ')
+Flow('del','vp0','math output=0.2 ')
+# Flow('eps','vp0','noise range=0.04 mean=0.4 rep=y')
+# Flow('del','vp0','noise range=0.04 mean=0.2 rep=y')
 Flow('eta','del eps','math d=${SOURCES[0]} e=${SOURCES[1]} output="(e-d)/(1+2*d)"')
 # Flow('vh','vp0 eps','math v=${SOURCES[0]} e=${SOURCES[1]} output="v*sqrt(1+2*e)"')
 # Flow('vn','vp0 del','math v=${SOURCES[0]} d=${SOURCES[1]} output="v*sqrt(1+2*d)"')

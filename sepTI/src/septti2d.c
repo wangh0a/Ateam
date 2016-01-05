@@ -447,7 +447,291 @@ fft_stepforward(
                        + 4.f * (3.f * eps[j][i] - del[j][i])* st2[j][i] * ct2[j][i]);
       }
     }
-  }
 
+  /* ================================================================== */
+#if 1
+    /* additional term 1  :   kx^6 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum;
+        if (!is_zero(k2sum)) ratio = kx2[ikx] * kx2[ikx] * kx2[ikx] / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] -= wt * rwavem[jj] * vp[j][i] * 4.f * eps[j][i] * (eps[j][i] - del[j][i])
+                    * ct2[j][i] * ct2[j][i] * st2[j][i];
+      }
+    }
+  
+    /* additional term 2  :   kz^6 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum;
+        if (!is_zero(k2sum)) ratio = kz2[ikz] * kz2[ikz] * kz2[ikz] / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] -= wt * rwavem[jj] * vp[j][i] * 4.f * eps[j][i] * (eps[j][i] - del[j][i])
+                    * ct2[j][i] * st2[j][i] * st2[j][i];
+      }
+    }
+
+    /* additional term 3  :   kx^5kz */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum;
+        if (!is_zero(k2sum)) ratio = kx2[ikx] * kx2[ikx] * kx[ikx] * kz[ikz] / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] -= wt * rwavem[jj] * vp[j][i] * 4.f * eps[j][i] * (eps[j][i] - del[j][i])
+                    * 2.f * st[j][i] * ct[j][i] *(ct2[j][i] * ct2[j][i] - 2.f * st2[j][i] * ct2[j][i]);
+      }
+    }
+
+    /* additional term 4  :   kz^5kx */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum;
+        if (!is_zero(k2sum)) ratio = kz2[ikz] * kz2[ikz] * kz[ikz] * kx[ikx] / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] -= wt * rwavem[jj] * vp[j][i] * 4.f * eps[j][i] * (eps[j][i] - del[j][i])
+                    * 2.f * st[j][i] * ct[j][i] *(st2[j][i] * st2[j][i] - 2.f * st2[j][i] * ct2[j][i]);
+      }
+    }
+
+
+    /* additional term 5  :   kx^4kz^2 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum;
+        if (!is_zero(k2sum)) ratio = kx2[ikx] * kx2[ikx] * kz2[ikz] / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] -= wt * rwavem[jj] * vp[j][i] * 4.f * eps[j][i] * (eps[j][i] - del[j][i])
+                    * ct2[j][i] * (ct2[j][i] * ct2[j][i] + 6.f * st2[j][i] * st2[j][i] - 8.f * st2[j][i] * ct2[j][i]);
+      }
+    }
+
+    /* additional term 6  :   kz^4kx^2 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum;
+        if (!is_zero(k2sum)) ratio = kz2[ikz] * kz2[ikz] * kx2[ikx] / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] -= wt * rwavem[jj] * vp[j][i] * 4.f * eps[j][i] * (eps[j][i] - del[j][i])
+                    * st2[j][i] * (st2[j][i] * st2[j][i] + 6.f * ct2[j][i] * ct2[j][i] - 8.f * st2[j][i] * ct2[j][i]);
+      }
+    }
+
+    /* additional term 7  :   kz^3kx^3 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum;
+        if (!is_zero(k2sum)) ratio = kz2[ikz] * kz[ikz] * kx2[ikx] * kx[ikx] / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] -= wt * rwavem[jj] * vp[j][i] * 4.f * eps[j][i] * (eps[j][i] - del[j][i])
+                    * st[j][i] * ct[j][i] * (20.f * st2[j][i] * ct2[j][i] - 4.f);
+      }
+    }
+
+
+    /* additional term 8  :   kx^8 + kz^8 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      float kx8 = kx2[ikx]*kx2[ikx]*kx2[ikx]*kx2[ikx];
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum * k2sum;
+        float kz8 = kz2[ikz]*kz2[ikz]*kz2[ikz]*kz2[ikz];
+        if (!is_zero(k2sum)) ratio = (kx8 + kz8) / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] += wt * rwavem[jj] * vp[j][i] * 4.f * (eps[j][i] - del[j][i]) * (eps[j][i] - del[j][i])
+                    * st2[j][i] * st2[j][i] * ct2[j][i] * ct2[j][i];
+      }
+    }
+
+    /* additional term 9  :   kx^7kz + kz^7kx */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      float kx6 = kx2[ikx]*kx2[ikx]*kx2[ikx];
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum * k2sum;
+        float kz6 = kz2[ikz]*kz2[ikz]*kz2[ikz];
+        if (!is_zero(k2sum)) ratio = kx[ikx] * kz[ikz] *(kx6 - kz6) / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] += wt * rwavem[jj] * vp[j][i] * 4.f * (eps[j][i] - del[j][i]) * (eps[j][i] - del[j][i])
+                    * 4.f * st2[j][i] * st[j][i] * ct2[j][i] * ct[j][i] * (st2[j][i] - ct2[j][i]);
+      }
+    }
+
+    /* additional term 10  :   kx^6kz^2 + kz^6kx^2 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      float kx4 = kx2[ikx]*kx2[ikx];
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum * k2sum;
+        float kz4 = kz2[ikz]*kz2[ikz];
+        if (!is_zero(k2sum)) ratio = kx2[ikx] * kz2[ikz] * (kx4 + kz4) / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] += wt * rwavem[jj] * vp[j][i] * 4.f * (eps[j][i] - del[j][i]) * (eps[j][i] - del[j][i])
+                    * st2[j][i] * ct2[j][i] * (6.f - 28.f * st2[j][i] * ct2[j][i]);
+      }
+    }
+
+    /* additional term 11  :   kx^5kz^3 + kz^5kx^3 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      float kx3 = kx2[ikx]*kx[ikx];
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum * k2sum;
+        float kz3 = kz2[ikz]*kz[ikz];
+        if (!is_zero(k2sum)) ratio = kx3 * kz3 * (kx2[ikx] - kz2[ikz]) / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] += wt * rwavem[jj] * vp[j][i] * 4.f * (eps[j][i] - del[j][i]) * (eps[j][i] - del[j][i])
+                    * st[j][i] * ct[j][i] * (
+                        24.f * st2[j][i] * ct2[j][i] * (st2[j][i] - ct2[j][i])
+                        + 4.f * (ct2[j][i]*ct2[j][i]*ct2[j][i] - st2[j][i]*st2[j][i]*st2[j][i])
+                      );
+      }
+    }
+
+    /* additional term 12  :   kx^4kz^4 + kz^4kx^4 */
+#pragma omp parallel for schedule(dynamic,1)
+    for (int ikx=0; ikx<nkx; ++ikx) {
+      for (int ikz=0; ikz<nkz; ++ikz) {
+        int idx = ikx * nkz + ikz;
+        float ratio = 0.f;
+        float k2sum = kx2[ikx] + kz2[ikz];
+        k2sum *= k2sum * k2sum;
+        if (!is_zero(k2sum)) ratio =  kx2[ikx] * kz2[ikz] * kx2[ikx] * kz2[ikz] / k2sum;
+        cwavem[idx] = cwave[idx] * ratio;
+      }
+    }
+    fftwf_execute(inverse_plan);
+#pragma omp parallel for schedule(dynamic,1)
+    for (int j=0; j<nx; j++) {
+      for (int i=0; i<nz; i++) {
+        int jj = j*nzpad + i;
+        u0[j][i] += wt * rwavem[jj] * vp[j][i] * 4.f * (eps[j][i] - del[j][i]) * (eps[j][i] - del[j][i])
+                    * (st2[j][i] * st2[j][i] * (st2[j][i] - 4.f*ct2[j][i]) * (st2[j][i] - 4.f*ct2[j][i])
+                     + ct2[j][i] * ct2[j][i] * (ct2[j][i] - 4.f*st2[j][i]) * (ct2[j][i] - 4.f*st2[j][i])  
+                     + 4.f * st2[j][i] * ct2[j][i] * (5.f * st2[j][i] * ct2[j][i] - 2.f)
+                    );
+      }
+    }
+
+
+#endif
+  }
   return;
 }
