@@ -66,7 +66,6 @@ plotD2D='transp |' + wplot.dgrey2d('',par)
 #modelingOp.ADJT('wav_a', 'fwfl')
 #Result('fwfl',plotW2D)
 
-# Flow('m2Da','win2D','spray axis=3 d=1 o=0 n=2 | window squeeze=n')
 Flow('m2Da','wav','''
     spray axis=1 n=%(nz)d d=%(dz)g o=%(oz)g label=%(lz)s unit=%(uz)s |
     spray axis=2 n=%(nx)d d=%(dx)g o=%(ox)g label=%(lx)s unit=%(ux)s |
