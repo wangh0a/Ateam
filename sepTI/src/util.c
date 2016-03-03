@@ -31,7 +31,9 @@ expand2d(float *uo, float *ui, int nzpad, int nxpad, int nz, int nx)
 void
 wwin2d(float **uo, float **ui, int nzo, int nxo, int nb)
 {
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 1) 
+#endif
   for (int ix=0; ix<nxo; ix++) {
     for (int iz=0; iz<nzo; iz++) {
       uo[ix][iz] = ui[ix+nb][iz+nb];
@@ -44,7 +46,9 @@ wwin2d(float **uo, float **ui, int nzo, int nxo, int nb)
 void
 wfld2d_inject(float **uo, float **ui, int nzo, int nxo, int nb)
 {
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 1) 
+#endif
   for (int ix=0; ix<nxo; ix++) {
     for (int iz=0; iz<nzo; iz++) {
       uo[ix+nb][iz+nb] += ui[ix][iz];
@@ -74,7 +78,9 @@ void
 damp2d_apply(float **uu, float *damp, int nz, int nx, int nb)
 {
   if (damp != NULL) {
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 1) 
+#endif
     for (int ib=0; ib<nb; ib++) {
       /* top/bottom boundary */
       for (int iz=0; iz<nz; iz++) {
@@ -82,7 +88,9 @@ damp2d_apply(float **uu, float *damp, int nz, int nx, int nb)
         uu[nx-1-ib][iz] *= damp[ib];
       }
     }
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 1) 
+#endif
     for (int ix=0; ix<nx; ix++) {
       for (int ib=0; ib<nb; ib++) {
         /* left/right boundary */

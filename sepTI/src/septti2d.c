@@ -235,7 +235,9 @@ int main (int argc, char *argv[])
 
 
   for (int it=itb; it!=ite; it+=itc) { if (verb) sf_warning("it = %d;",it);
+#ifdef _OPENMP
     double tic = omp_get_wtime();
+#endif
     if (ipt) {
       if (adj) sf_seek(file_inp, (off_t)(it)*sizeof(float)*sf_n(ai), SEEK_SET);
       sf_floatread(wi, sf_n(ai), file_inp);
@@ -276,9 +278,10 @@ int main (int argc, char *argv[])
       wwin2d(ucut, u0, nz0, nx0, nb);
       sf_floatwrite(ucut[0], nz0*nx0, file_out);
     }
-
+#ifdef _OPENMP
     double toc = omp_get_wtime();
     if (verb) fprintf(stderr," clock = %lf;", toc-tic);
+#endif
   } /* END OF TIME LOOP */
   return 0;
 }
@@ -296,8 +299,9 @@ fft_stepforward(
     float wt, bool adj)
 
 {
-
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
   for (int ix=0; ix<nxpad; ix++) {
     memset(&rwave[ix*nzpad], 0, sizeof(float)*nzpad);
     memset(&rwavem[ix*nzpad], 0, sizeof(float)*nzpad);
@@ -308,7 +312,9 @@ fft_stepforward(
   if (adj) { /* adjoint modeling */
     /* add adjoint code here */
   } else { /* forward modeling */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
       for (int j=0; j<nx; j++) {
         for (int i=0; i<nz; i++) {
           int jj = j*nzpad + i;
@@ -321,7 +327,9 @@ fft_stepforward(
     fftwf_execute(forward_plan);
 
     /* term 1 ------------- */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -329,7 +337,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -338,7 +348,9 @@ fft_stepforward(
     }
 
     /* term 2 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -350,7 +362,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -360,7 +374,9 @@ fft_stepforward(
     }
 
     /* term 3 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -371,7 +387,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -381,7 +399,9 @@ fft_stepforward(
     }
 
     /* term 4 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -392,7 +412,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -404,7 +426,9 @@ fft_stepforward(
 
 
     /* term 5 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -415,7 +439,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -427,7 +453,9 @@ fft_stepforward(
 
 
     /* term 6 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -438,7 +466,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -451,7 +481,9 @@ fft_stepforward(
   /* ================================================================== */
 #if 1
     /* additional term 1  :   kx^6 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -463,7 +495,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -473,7 +507,9 @@ fft_stepforward(
     }
   
     /* additional term 2  :   kz^6 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -485,7 +521,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -495,7 +533,9 @@ fft_stepforward(
     }
 
     /* additional term 3  :   kx^5kz */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -507,7 +547,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -517,7 +559,9 @@ fft_stepforward(
     }
 
     /* additional term 4  :   kz^5kx */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -529,7 +573,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -540,7 +586,9 @@ fft_stepforward(
 
 
     /* additional term 5  :   kx^4kz^2 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -552,7 +600,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -562,7 +612,9 @@ fft_stepforward(
     }
 
     /* additional term 6  :   kz^4kx^2 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -574,7 +626,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -584,7 +638,9 @@ fft_stepforward(
     }
 
     /* additional term 7  :   kz^3kx^3 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -596,7 +652,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -607,7 +665,9 @@ fft_stepforward(
 
 
     /* additional term 8  :   kx^8 + kz^8 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       float kx8 = kx2[ikx]*kx2[ikx]*kx2[ikx]*kx2[ikx];
       for (int ikz=0; ikz<nkz; ++ikz) {
@@ -621,7 +681,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -631,7 +693,9 @@ fft_stepforward(
     }
 
     /* additional term 9  :   kx^7kz + kz^7kx */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       float kx6 = kx2[ikx]*kx2[ikx]*kx2[ikx];
       for (int ikz=0; ikz<nkz; ++ikz) {
@@ -645,7 +709,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -655,7 +721,9 @@ fft_stepforward(
     }
 
     /* additional term 10  :   kx^6kz^2 + kz^6kx^2 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       float kx4 = kx2[ikx]*kx2[ikx];
       for (int ikz=0; ikz<nkz; ++ikz) {
@@ -669,7 +737,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -679,7 +749,9 @@ fft_stepforward(
     }
 
     /* additional term 11  :   kx^5kz^3 + kz^5kx^3 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       float kx3 = kx2[ikx]*kx[ikx];
       for (int ikz=0; ikz<nkz; ++ikz) {
@@ -693,7 +765,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
@@ -706,7 +780,9 @@ fft_stepforward(
     }
 
     /* additional term 12  :   kx^4kz^4 + kz^4kx^4 */
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int ikx=0; ikx<nkx; ++ikx) {
       for (int ikz=0; ikz<nkz; ++ikz) {
         int idx = ikx * nkz + ikz;
@@ -718,7 +794,9 @@ fft_stepforward(
       }
     }
     fftwf_execute(inverse_plan);
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
+#endif
     for (int j=0; j<nx; j++) {
       for (int i=0; i<nz; i++) {
         int jj = j*nzpad + i;
