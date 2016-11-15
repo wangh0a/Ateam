@@ -50,8 +50,8 @@ Flow('eta','del eps','math d=${SOURCES[0]} e=${SOURCES[1]} output="(e-d)/(1+2*d)
 # Flow('vn','vp0 del','math v=${SOURCES[0]} d=${SOURCES[1]} output="v*sqrt(1+2*d)"')
 # Flow('theta','vp0','noise range=40 mean=0 rep=y')
 Flow('theta','vp0','math output=40 ')
-# Flow('mvars','vp0 eps del theta','cat axis=3 ${SOURCES[1:-1]}')
-Flow('mvars','vp0 eps del','cat axis=3 ${SOURCES[1:-1]}')
+Flow('mvars','vp0 eps del theta','cat axis=3 ${SOURCES[1:-1]}')
+# Flow('mvars','vp0 eps del','cat axis=3 ${SOURCES[1:-1]}')
 
 # ------------------------------------------------------------
 # DOT PRODUCT TEST
@@ -88,6 +88,7 @@ for DICT in [A2Da, A2Db, A2Dc, A2Dd]:
     G=DICT['op']('mvars',DICT['ss'],DICT['rr'],par)
 
     G.FORW( 'm'+DICT['tag'],'d'+DICT['tag'])
+    G.FORW( 'm'+DICT['tag'],'d'+DICT['tag']+'2')
     G.ADJT( 'k'+DICT['tag'],'d'+DICT['tag'])
 
     D=DPT(G,'m'+DICT['tag'],'d'+DICT['tag'])

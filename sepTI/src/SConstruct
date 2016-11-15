@@ -6,7 +6,8 @@ env['SHLIBPREFIX'] = ''
 
 cc = os.environ['CC']
 cxx = os.environ['CXX']
-cflags = '-std=c99 -fPIC -Wall -Wextra -O3 -DHAVE_INLINE -fopenmp -msse2 -msse -DSF_HAS_FFTW -DSF_HAS_FFTW_OMP'
+# cflags = '-std=c99 -fPIC -Wall -Wextra -O3 -DHAVE_INLINE -fopenmp -msse2 -msse -DSF_HAS_FFTW -DSF_HAS_FFTW_OMP'
+cflags = '-std=c99 -fPIC -Wall -Wextra -O3 -DHAVE_INLINE -msse2 -msse -DSF_HAS_FFTW'
 
 libpath = ['.']
 cpppath = ['.']
@@ -22,7 +23,8 @@ fftw_lib = os.environ['FFTW_LIB']
 cpppath.append(rsf_inc)
 libpath.append(rsf_lib)
 libpath.append('.')
-libs = ['rsf','su','m','gomp','gfortran']
+# libs = ['rsf','su','m','gomp','gfortran']
+libs = ['rsf','su','m','','gfortran']
 
 env.Library('util',['util.c'],CC=cc,CFLAGS=cflags,CPPPATH=cpppath,LIBS=libs,LIBPATH=libpath)
 
@@ -30,8 +32,10 @@ env.Library('sinc',['sinc.c'],CC=cc,CFLAGS=cflags,CPPPATH=cpppath,LIBS=libs,LIBP
 
 cpppath.append(fftw_inc)
 libpath.append(fftw_lib)
-libs = ['rsf','su','m','fftw3f_omp','fftw3f']
-linkflags = ['-fopenmp']
+libs = ['rsf','su','m','','fftw3f']
+linkflags = ['']
+# libs = ['rsf','su','m','fftw3f_omp','fftw3f']
+# linkflags = ['-fopenmp']
 
 env.Program('sepvti2d.x',['sepvti2d.c'],CC=cc,CFLAGS=cflags,CPPPATH=cpppath,
             LIBPATH=libpath,LINKFLAGS=linkflags,LIBS=['sinc','util']+libs)

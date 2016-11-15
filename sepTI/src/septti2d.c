@@ -6,9 +6,11 @@
 #include <fftw3.h>
 #include "util.h"
 #include "sinc.h"
+#include <math.h>
 
 #define EPSILON 1e-6
-#define is_zero(a) essentiallyEqual(a, 0.f, EPSILON)
+static inline bool is_zero(float a) { return fpclassify(a) == FP_ZERO;}
+/* #define is_zero(a) essentiallyEqual(a, 0.f, EPSILON) */
 
 static void
 fft_stepforward(
